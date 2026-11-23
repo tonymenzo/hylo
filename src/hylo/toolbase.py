@@ -929,8 +929,14 @@ TOOLKIT_GUIDANCE = """
 
 Domain tools come from toolbase toolkits, served to you as
 `<toolkit>__<tool>` (in Claude Code: `mcp__toolbase__<toolkit>__<tool>`).
+<!-- root -->
 You may hold more than you are served: take what your work needs with
 `GrantToolkits(child="self", ...)`.
+<!-- /root -->
+<!-- worker -->
+Your parent chose what you are served; ask it with `RequestToolkits` for
+anything your work needs beyond that.
+<!-- /worker -->
 <!-- spawn -->
 You can also hand toolkits to the agents you spawn, but only ones you
 hold yourself; grants attenuate down the tree, like addresses and
@@ -956,12 +962,14 @@ result must pass), and review what it returns before you rely on it.
   starts as soon as its current turn ends (it gets a grant notice).
 <!-- /spawn -->
 <!-- nospawn -->
+<!-- root -->
 - `GrantToolkits(child="self", toolkits)` — add toolkits you hold to
   your own grant. A running turn never gains tools: you can call them
   from your next turn, which hylo starts as soon as this one ends (you
   get a grant notice). Take what the current step needs, not
   everything you hold: a short, relevant tool list is used far better
   than a long one.
+<!-- /root -->
 <!-- /nospawn -->
 - `RequestToolkits(toolkits, reason)` — ask your parent for tools you
   lack. You'll get a grant notice, then the tools from your next turn,

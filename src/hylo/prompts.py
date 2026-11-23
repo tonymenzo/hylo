@@ -69,7 +69,8 @@ _ORCHESTRAL_FILES = (
 )
 _ORCHESTRAL_NONE = (
     "None: you have no shell or file tools. Do work that needs them through "
-    "a child granted the right tools, or a toolkit."
+    "a toolkit<!-- spawn -->, or a child granted the right tools<!-- /spawn -->"
+    "<!-- worker -->, or ask your parent for it<!-- /worker -->."
 )
 
 
@@ -103,8 +104,7 @@ def _sandbox(record: "AgentRecord", runtime: "Runtime") -> str:
     return str(path) if path else "(none)"
 
 
-_SPAWN = re.compile(r"<!-- spawn -->\n(.*?)<!-- /spawn -->\n", re.S)
-_NOSPAWN = re.compile(r"<!-- nospawn -->\n(.*?)<!-- /nospawn -->\n", re.S)
+_SECTION = re.compile(r"<!-- (spawn|nospawn|root|worker) -->\n?(.*?)<!-- /\1 -->\n?", re.S)
 
 
 def can_spawn(record: "AgentRecord", runtime: "Runtime") -> bool:
@@ -112,11 +112,13 @@ def can_spawn(record: "AgentRecord", runtime: "Runtime") -> bool:
     return record.depth < getattr(runtime, "max_depth", 3)
 
 
-def _for_capability(text: str, spawn: bool) -> str:
-    """Keep the sections for what the agent can do: the spawning and combinator sections only when it can
-    create agents, the note on working without children only when it cannot."""
-    keep, drop = (_SPAWN, _NOSPAWN) if spawn else (_NOSPAWN, _SPAWN)
-    return keep.sub(lambda m: m.group(1), drop.sub("", text))
+def _for_capability(text: str, spawn: bool, root: bool = True) -> str:
+    """Keep the sections for what the agent can do: `spawn` (it can create agents) or `nospawn`, and `root`
+    (it has no parent, so it serves itself) or `worker` (it asks its parent)."""
+    keep = {"spawn": spawn, "nospawn": not spawn, "root": root, "worker": not root}
+    while _SECTION.search(text):
+        text = _SECTION.sub(lambda m: m.group(2) if keep[m.group(1)] else "", text)
+    return text
 
 
 def build_system_prompt(record: "AgentRecord", runtime: "Runtime", engine: str) -> str:
@@ -132,12 +134,13 @@ def build_system_prompt(record: "AgentRecord", runtime: "Runtime", engine: str) 
         max_depth=str(getattr(runtime, "max_depth", 3)),
         sandbox=_sandbox(record, runtime),
     )
-    prompt = _for_capability(prompt, spawn)
+    root = record.parent is None
+    prompt = _for_capability(prompt, spawn, root)
     hub = getattr(runtime, "toolbase", None)
     if hub is not None:
         from hylo.toolbase import TOOLKIT_GUIDANCE, toolkit_brief
 
-        prompt += "\n" + _for_capability(TOOLKIT_GUIDANCE, spawn)
+        prompt += "\n" + _for_capability(TOOLKIT_GUIDANCE, spawn, root)
         prompt += toolkit_brief(hub, record.spec, engine)
     if spawn and getattr(runtime, "models", None) is not None:
         from hylo.models import MODEL_GUIDANCE
