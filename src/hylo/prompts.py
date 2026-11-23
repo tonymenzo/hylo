@@ -17,6 +17,7 @@ a change to the document reaches all of them.
 from __future__ import annotations
 
 import functools
+import re
 import string
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -102,7 +103,24 @@ def _sandbox(record: "AgentRecord", runtime: "Runtime") -> str:
     return str(path) if path else "(none)"
 
 
+_SPAWN = re.compile(r"<!-- spawn -->\n(.*?)<!-- /spawn -->\n", re.S)
+_NOSPAWN = re.compile(r"<!-- nospawn -->\n(.*?)<!-- /nospawn -->\n", re.S)
+
+
+def can_spawn(record: "AgentRecord", runtime: "Runtime") -> bool:
+    """Whether this agent may create agents: its children would sit within ``max_depth``."""
+    return record.depth < getattr(runtime, "max_depth", 3)
+
+
+def _for_capability(text: str, spawn: bool) -> str:
+    """Keep the sections for what the agent can do: the spawning and combinator sections only when it can
+    create agents, the note on working without children only when it cannot."""
+    keep, drop = (_SPAWN, _NOSPAWN) if spawn else (_NOSPAWN, _SPAWN)
+    return keep.sub(lambda m: m.group(1), drop.sub("", text))
+
+
 def build_system_prompt(record: "AgentRecord", runtime: "Runtime", engine: str) -> str:
+    spawn = can_spawn(record, runtime)
     prompt = _template().safe_substitute(
         engine_title=_ENGINE_TITLES.get(engine, f"{engine} engine"),
         tool_naming=_TOOL_NAMING.get(engine, _TOOL_NAMING["orchestral"]),
@@ -114,13 +132,14 @@ def build_system_prompt(record: "AgentRecord", runtime: "Runtime", engine: str) 
         max_depth=str(getattr(runtime, "max_depth", 3)),
         sandbox=_sandbox(record, runtime),
     )
+    prompt = _for_capability(prompt, spawn)
     hub = getattr(runtime, "toolbase", None)
     if hub is not None:
         from hylo.toolbase import TOOLKIT_GUIDANCE, toolkit_brief
 
-        prompt += "\n" + TOOLKIT_GUIDANCE
+        prompt += "\n" + _for_capability(TOOLKIT_GUIDANCE, spawn)
         prompt += toolkit_brief(hub, record.spec, engine)
-    if getattr(runtime, "models", None) is not None:
+    if spawn and getattr(runtime, "models", None) is not None:
         from hylo.models import MODEL_GUIDANCE
 
         prompt += "\n" + MODEL_GUIDANCE

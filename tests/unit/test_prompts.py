@@ -42,3 +42,20 @@ def test_tool_names_match_the_prompt_on_orchestral():
     names = [t.get_name() for t in build_tools("t", ["all"])]
     for n in ("Spawn", "WaitFor", "Recv", "AgentMap", "ToolCatalog", "GrantToolkits", "ModelCatalog", "Bash"):
         assert n in names
+
+
+def test_an_agent_that_cannot_spawn_is_not_taught_to():
+    """Depth at max_depth: no Spawn/Call/combinator sections, no child supervision, the note on working
+    without children instead; messaging stays. An agent that can spawn gets the reverse."""
+    for max_depth, spawns in ((0, False), (2, True)):
+        rt = Runtime(max_depth=max_depth)
+        rec = rt.record_for(rt.root(AgentSpec(role_prompt="r", label="root")))
+        p = build_system_prompt(rec, rt, "orchestral")
+        for text in ("**Reach for `Call` first.**", "AgentMap(spec, items", "## Child lifecycle events",
+                     "## When to spawn vs. when to do it yourself", "## Common patterns"):
+            assert (text in p) == spawns, (max_depth, text)
+        assert ("## Working without children" in p) == (not spawns)
+        for text in ("`Send(to, body)`", "`Recv(", "`WaitFor(", "`ListInbox(", "## When to stop"):
+            assert text in p
+        assert "<!-- spawn -->" not in p and "<!-- nospawn -->" not in p
+        rt.shutdown()
