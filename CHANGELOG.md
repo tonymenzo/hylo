@@ -8,6 +8,9 @@ this file as its notes.
 
 ## [Unreleased]
 
+### Fixed
+- Claude engine: a turn the CLI ends on a failed API call (no network, an outage, HTTP 429/529) is an errored turn. The CLI prints "API Error: ..." as the reply and ends the turn as if it had finished, so an agent that did no work was marked idle and a run with no network was recorded as completed. The engine now raises `ClaudeAPIError`, so the driver marks the agent errored, tells its parent, and the root's supervisor can retry.
+
 ## [0.3.4] — 2026-11-23
 
 ### Changed

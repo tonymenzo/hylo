@@ -737,10 +737,16 @@ class ClaudeAgentEngine:
         # counts. The per-turn UI shows only output tokens; the
         # bottom gutter's context-window meter covers input.
         turn_tokens_out = 0
+        api_error: str | None = None
         try:
             await self._client.query(prompt)
             async for msg in self._client.receive_response():
                 if isinstance(msg, AssistantMessage):
+                    if getattr(msg, "error", None):
+                        # The CLI reports a failed API call (no network, a rate
+                        # limit, an outage) as an assistant message whose text is
+                        # "API Error: ..."; the turn did no work.
+                        api_error = f"{msg.error}: {_extract_text(msg) or 'no text'}"
                     observed = getattr(msg, "model", None)
                     if isinstance(observed, str) and observed and observed != self._observed_model:
                         self._observed_model = observed
@@ -799,6 +805,18 @@ class ClaudeAgentEngine:
                             self._cost_used += float(cost)
                         except (TypeError, ValueError):
                             pass
+                    status = getattr(msg, "api_error_status", None)
+                    if getattr(msg, "is_error", False) and (
+                            status is not None or getattr(msg, "subtype", None) == "success"):
+                        # The agent loop ended on a failed API call.
+                        api_error = api_error or (
+                            f"HTTP {status}: " if status is not None else "") + (
+                            getattr(msg, "result", None) or "API error")
+            if api_error is not None:
+                # An errored turn, so the driver marks the agent ``error``,
+                # tells its parent, and the root's supervisor can retry; a turn
+                # that only printed the error would read as finished.
+                raise ClaudeAPIError(api_error)
         finally:
             # Close any block left dangling — exception mid-turn, or a
             # final assistant message we never saw the close of.
@@ -855,6 +873,10 @@ class ClaudeAgentEngine:
         from hylo.prompts import build_system_prompt
 
         return build_system_prompt(record, runtime, engine)
+
+
+class ClaudeAPIError(RuntimeError):
+    """A turn the Claude CLI ended on a failed API call."""
 
 
 @functools.cache
