@@ -125,6 +125,11 @@ class CodexEngine:
         self._grant_note: str | None = None
         self._observed_model: str | None = None
         self._context: tuple[int, int] | None = None
+        # The thread's running total from the session file's token_count
+        # (``total_token_usage``), as hylo.provenance.token_usage: it holds
+        # the usage of a turn that never reached turn.completed (an agent
+        # terminated mid-turn), which the stream sum misses.
+        self._session_usage: dict[str, int] | None = None
         # The session file is read incrementally: its path, the offset read
         # to, and when (context_usage polls it during a long turn).
         self._meta_lock = threading.Lock()
@@ -247,7 +252,11 @@ class CodexEngine:
     def usage(self) -> dict[str, Any]:
         """Token counts over this agent's turns; ``token_usage`` as
         :func:`hylo.provenance.token_usage`."""
+        self._read_session_meta()
         t = dict(self._token_usage)
+        s = self._session_usage
+        if s and (s["input"], s["output"]) > (t["input"], t["output"]):
+            t = dict(s)
         return {"tokens_in": t["input"], "tokens_out": t["output"], "unpriced_tokens": 0,
                 "token_usage": t}
 
@@ -413,6 +422,11 @@ class CodexEngine:
                             if isinstance(info, dict):
                                 if isinstance(info.get("model_context_window"), int):
                                     window = info["model_context_window"]
+                                total = info.get("total_token_usage")
+                                if isinstance(total, dict):
+                                    from hylo.provenance import token_usage
+
+                                    self._session_usage = token_usage(total)
                                 last = info.get("last_token_usage")
                                 if isinstance(last, dict) and isinstance(last.get("input_tokens"), int):
                                     used = last["input_tokens"]

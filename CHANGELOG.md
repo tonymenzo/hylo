@@ -14,6 +14,9 @@ this file as its notes.
 - The system prompt follows what the agent can do. An agent that cannot create agents (its depth is at `max_depth`, such as a root with `max_depth: 0` or a worker at the limit) no longer gets the `Spawn`, `Call` and combinator sections, the patterns for them, child supervision, the advice on when to spawn, the model guidance or the toolkit guide's parts about children; it gets a short note on working without children instead, and the toolkit guide tells it to grant itself what the current step needs. Messaging (`Send`, `Recv`, `WaitFor`, `ListInbox`) is unchanged. `agent.md` and `TOOLKIT_GUIDANCE` mark the parts with `<!-- spawn -->` / `<!-- nospawn -->`.
 - The toolkit guide no longer says toolkits are mainly for the agents you spawn or to spawn an agent for each piece of work, which contradicted the advice to be conservative about spawning; it says what to give an agent when you do spawn one.
 
+### Fixed
+- A Codex agent terminated mid-turn kept no token usage: the stream sum counts only turns that reach `turn.completed`. Its usage now falls back on the running total in the thread's session file (`total_token_usage`), so a writer stopped by its parent after replying no longer records 0 tokens.
+
 ## [0.3.3] — 2026-11-18
 
 ### Changed
