@@ -368,3 +368,23 @@ def test_a_permission_profile_refuses_relative_paths_and_unknown_access(tmp_path
     with pytest.raises(ValueError, match="read, write or none"):
         _permission_profile({":minimal": "exec"})
     assert _permission_profile(None) is None and _permission_profile({}) is None
+
+
+def test_a_turn_cut_short_keeps_the_usage_the_session_file_recorded(tmp_path):
+    # An agent terminated mid-turn never reaches turn.completed, so the
+    # stream sum misses that turn; the session file's running total holds it.
+    rt, rec, engine, events, calls = _engine(tmp_path)
+    try:
+        engine.thread_id = "thread-cut"
+        day = tmp_path / "home" / "sessions" / "2026" / "11" / "23"
+        day.mkdir(parents=True)
+        (day / "rollout-thread-cut.jsonl").write_text(
+            '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":'
+            '{"input_tokens":1437412,"cached_input_tokens":1232896,"output_tokens":8401},'
+            '"last_token_usage":{"input_tokens":108544},"model_context_window":475000}}}\n')
+        assert engine.usage()["token_usage"] == {
+            "input": 1437412, "output": 8401, "cache_read": 1232896, "cache_creation": 0}
+        assert engine.usage()["tokens_in"] == 1437412
+    finally:
+        engine.shutdown()
+        rt.shutdown()
