@@ -498,3 +498,57 @@ def test_messages_larger_than_the_sdk_default_are_accepted(tmp_path):
         engine = ClaudeAgentEngine(record=record, runtime=rt, sandbox_dir=tmp_path,
                                    allowed_tools=record.spec.tools)
     assert engine._options.max_buffer_size == MAX_MESSAGE_BYTES > 1024 * 1024
+
+
+def _scripted_turn(engine, messages):
+    """Make the engine's client yield ``messages`` for the next turn."""
+    class _Client:
+        async def connect(self):
+            pass
+
+        async def query(self, prompt):
+            pass
+
+        async def receive_response(self):
+            for m in messages:
+                yield m
+
+        async def get_server_info(self):
+            return {}
+    engine._client = _Client()
+    engine._connected = True
+
+
+def test_a_turn_that_ends_on_an_api_error_is_an_errored_turn(tmp_path):
+    """No network: the CLI prints "API Error: ..." and ends the turn as if
+    it had finished; the engine raises, so the driver marks the turn errored."""
+    from claude_agent_sdk.types import AssistantMessage, ResultMessage, TextBlock
+
+    import hylo.engines.claude_agent as ca
+    from hylo.runtime import Runtime
+    rt = Runtime()
+    engine = _bare_engine(tmp_path, rt)
+    text = "API Error: Can't reach the API server - check your internet or DNS (ENOTFOUND)"
+    _scripted_turn(engine, [
+        AssistantMessage(content=[TextBlock(text=text)], model="<synthetic>", error="unknown"),
+        ResultMessage(subtype="success", duration_ms=1, duration_api_ms=0, is_error=True,
+                      num_turns=1, session_id="s", result=text, usage={}),
+    ])
+    with pytest.raises(ca.ClaudeAPIError, match="ENOTFOUND"):
+        engine.step("go")
+
+    _scripted_turn(engine, [
+        ResultMessage(subtype="success", duration_ms=1, duration_api_ms=0, is_error=True,
+                      num_turns=1, session_id="s", result="API Error: overloaded",
+                      api_error_status=529, usage={}),
+    ])
+    with pytest.raises(ca.ClaudeAPIError, match="HTTP 529"):
+        engine.step("go")
+
+    _scripted_turn(engine, [
+        AssistantMessage(content=[TextBlock(text="done")], model="claude-opus-5-5"),
+        ResultMessage(subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
+                      num_turns=1, session_id="s", result="done", usage={}),
+    ])
+    assert engine.step("go") == "done"
+    rt.shutdown()
