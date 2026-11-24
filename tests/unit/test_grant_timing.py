@@ -98,7 +98,8 @@ def test_self_grant_tells_the_root_to_end_its_turn():
     assert "NOT this one" in out["note"] and "End this turn" in out["note"]
     [env] = _notices(rt, root)
     assert "you granted yourself" in env.body["note"]
-    assert sorted(t.split("__", 2)[-1] for t in env.body["tools"]) == ["hep__Decay", "hep__Pythia"]
+    # The toolkit and tool, whatever server prefix the engine adds.
+    assert sorted("__".join(t.split("__")[-2:]) for t in env.body["tools"]) == ["hep__Decay", "hep__Pythia"]
     rt.shutdown()
 
 

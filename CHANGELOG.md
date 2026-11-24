@@ -8,8 +8,11 @@ this file as its notes.
 
 ## [Unreleased]
 
+## [0.3.5] — 2026-11-24
+
 ### Fixed
 - Claude engine: a turn the CLI ends on a failed API call (no network, an outage, HTTP 429/529) is an errored turn. The CLI prints "API Error: ..." as the reply and ends the turn as if it had finished, so an agent that did no work was marked idle and a run with no network was recorded as completed. The engine now raises `ClaudeAPIError`, so the driver marks the agent errored, tells its parent, and the root's supervisor can retry.
+- A grant-notice test compared tool names after stripping one prefix too many; it compares the toolkit and tool names now.
 
 ## [0.3.4] — 2026-11-23
 
