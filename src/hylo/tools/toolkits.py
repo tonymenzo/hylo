@@ -81,12 +81,11 @@ def catalog_impl(
         )
         if record.parent is None and not served and authority:
             out["note"] += (
-                " You hold these mainly to grant: spawn an agent for each piece "
-                "of work with the tools it needs (Spawn(..., toolkits=[...])), "
-                "give it the context it lacks, and check what it returns. To "
-                "call one yourself, GrantToolkits(child=\"self\", toolkits=[...]); "
-                "it's callable from your next turn, which starts as soon as "
-                "you end this one."
+                " You are served none of these yet. To call one yourself, "
+                "GrantToolkits(child=\"self\", toolkits=[...]); it's callable "
+                "from your next turn, which starts as soon as you end this one. "
+                "Where you may spawn agents, you can also grant them a slice "
+                "(Spawn(..., toolkits=[...]))."
             )
     return out
 
@@ -311,8 +310,7 @@ class GrantToolkitsTool(StatelessRuntimeTool):
     turn (conversation intact), which hylo starts for it as soon as its
     current turn ends: it is sent a grant notice that says so. Use this to answer a child's ``toolkit_request``. The root
     may also grant itself (``child="self"``) from what it may grant, to
-    call those tools directly from its next turn; its toolkits are
-    mainly for the agents it spawns.
+    call those tools directly from its next turn.
 
     Error codes: ``toolkit_denied`` (you don't hold it / not installed),
     ``not_permitted`` (target isn't your descendant)."""

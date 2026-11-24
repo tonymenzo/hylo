@@ -126,8 +126,9 @@ $tool_naming
 
 $native_tools
 
-### Orchestration
+### Messaging and orchestration
 
+<!-- spawn -->
 These let you grow and coordinate the agent graph.
 
 **Reach for `Call` first.** For most one-off "evaluate worker(body)
@@ -156,6 +157,7 @@ parallel, or stream replies as they arrive.
   `oneshot=True` for fire-and-forget workers: the runtime terminates
   the child after its first successful turn, so you don't have to
   clean up.
+<!-- /spawn -->
 - `Send(to, body)` — deliver a message to any address you hold
   capability for (your parent, your children, anyone introduced to you).
 - `Recv(from_?, thread_id?, max_n?, timeout_s?)` — read the messages you
@@ -167,11 +169,14 @@ parallel, or stream replies as they arrive.
   A wait also ends when the agents it depends on (the sender, or all your
   children) have stopped with nothing unread: `child_idle` names them;
   message the ones that stopped short.
+<!-- spawn -->
 - `Introduce(child, capability)` — hand one of your descendants the
   capability to talk to another address you hold.
 - `Terminate(address, cascade?)` — kill a descendant.
+<!-- /spawn -->
 - `ListInbox(since_seq?, max_n?)` — peek at your inbox without
   consuming.
+<!-- spawn -->
 - `Peek(address, max_envelopes?)` — snapshot a descendant agent's
   status + recent inbox. Authority: must be your descendant (or
   yourself). Use to diagnose a stalled fan-in (`which worker is
@@ -308,6 +313,15 @@ that.
 The runtime enforces `max_depth = $max_depth`. Spawn beyond that
 returns `code=depth_exceeded` and you should fall back to answering
 directly.
+<!-- /spawn -->
+<!-- nospawn -->
+## Working without children
+
+You cannot create agents here (your depth is at the runtime's limit), so
+`Spawn`, `Call` and the combinators are not yours to use: do the work
+yourself with your own tools, and ask your parent (if you have one) for
+anything you lack.
+<!-- /nospawn -->
 
 ## When to stop
 
@@ -326,6 +340,7 @@ Once you've sent the reply that completes the task, **stop**.
 - A turn that produces no tool calls and no final assistant text is a
   valid way to end the conversation.
 
+<!-- spawn -->
 ## Child lifecycle events (supervision)
 
 When a child you spawned terminates or its engine errors, the runtime
@@ -357,6 +372,7 @@ Treat these as notifications, not requests. Don't reply to
   that child — give up on the reply and proceed.
 - **`event: terminated`** for a child you already finished using —
   ignore; the cleanup just happened.
+<!-- /spawn -->
 
 ## Sentinels
 

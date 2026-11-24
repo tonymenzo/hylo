@@ -42,3 +42,41 @@ def test_tool_names_match_the_prompt_on_orchestral():
     names = [t.get_name() for t in build_tools("t", ["all"])]
     for n in ("Spawn", "WaitFor", "Recv", "AgentMap", "ToolCatalog", "GrantToolkits", "ModelCatalog", "Bash"):
         assert n in names
+
+
+def test_an_agent_that_cannot_spawn_is_not_taught_to():
+    """Depth at max_depth: no Spawn/Call/combinator sections, no child supervision, the note on working
+    without children instead; messaging stays. An agent that can spawn gets the reverse."""
+    for max_depth, spawns in ((0, False), (2, True)):
+        rt = Runtime(max_depth=max_depth)
+        rec = rt.record_for(rt.root(AgentSpec(role_prompt="r", label="root")))
+        p = build_system_prompt(rec, rt, "orchestral")
+        for text in ("**Reach for `Call` first.**", "AgentMap(spec, items", "## Child lifecycle events",
+                     "## When to spawn vs. when to do it yourself", "## Common patterns"):
+            assert (text in p) == spawns, (max_depth, text)
+        assert ("## Working without children" in p) == (not spawns)
+        for text in ("`Send(to, body)`", "`Recv(", "`WaitFor(", "`ListInbox(", "## When to stop"):
+            assert text in p
+        assert "<!-- spawn -->" not in p and "<!-- nospawn -->" not in p
+        rt.shutdown()
+
+
+def test_a_worker_at_the_depth_limit_asks_its_parent_and_a_root_serves_itself():
+    from hylo.prompts import _for_capability
+    from hylo.toolbase import TOOLKIT_GUIDANCE
+
+    rt = Runtime(max_depth=1)
+    root = rt.root(AgentSpec(role_prompt="r", label="root"))
+    leaf = rt.record_for(rt._spawn(parent=root, spec=AgentSpec(role_prompt="w", tools=["primitive"])))
+    p = build_system_prompt(leaf, rt, "orchestral")
+    assert "## Working without children" in p and "**Reach for `Call` first.**" not in p
+    assert "a child granted the right tools" not in p and "ask your parent for it" in p
+    worker = _for_capability(TOOLKIT_GUIDANCE, spawn=False, root=False)
+    solo = _for_capability(TOOLKIT_GUIDANCE, spawn=False, root=True)
+    team = _for_capability(TOOLKIT_GUIDANCE, spawn=True, root=True)
+    assert 'GrantToolkits(child="self", toolkits)' not in worker and "ask it with `RequestToolkits`" in worker
+    assert 'GrantToolkits(child="self", toolkits)' in solo and "Spawn(..., toolkits" not in solo
+    assert "Spawn(..., toolkits" in team and "mainly for the agents you spawn" not in team
+    for text in (worker, solo, team):
+        assert "<!--" not in text
+    rt.shutdown()

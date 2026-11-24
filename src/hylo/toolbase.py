@@ -929,21 +929,27 @@ TOOLKIT_GUIDANCE = """
 
 Domain tools come from toolbase toolkits, served to you as
 `<toolkit>__<tool>` (in Claude Code: `mcp__toolbase__<toolkit>__<tool>`).
-You can hand toolkits to the agents you spawn — but only ones you hold
-yourself. Grants attenuate down the tree, like addresses and budgets.
-
-Your toolkits are mainly for the agents you spawn. You see the whole task,
-so you choose each agent's tools and write its brief better than it could
-itself: spawn an agent for each piece of work with the tools that work
-needs, tell it what it cannot know (its inputs, the conventions already
-fixed, the check its result must pass), and review what it returns before
-you rely on it. You can also take tools yourself
-(`GrantToolkits(child="self", ...)`) for your own work, such as a quick
-check of a child's result.
+<!-- root -->
+You may hold more than you are served: take what your work needs with
+`GrantToolkits(child="self", ...)`.
+<!-- /root -->
+<!-- worker -->
+Your parent chose what you are served; ask it with `RequestToolkits` for
+anything your work needs beyond that.
+<!-- /worker -->
+<!-- spawn -->
+You can also hand toolkits to the agents you spawn, but only ones you
+hold yourself; grants attenuate down the tree, like addresses and
+budgets. When you spawn an agent, you see the whole task, so you choose
+its tools and write its brief better than it could itself: tell it what
+it cannot know (its inputs, the conventions already fixed, the check its
+result must pass), and review what it returns before you rely on it.
+<!-- /spawn -->
 
 - `ToolCatalog()` — the toolkits you hold: descriptions, bundles,
   tool and skill counts. `ToolCatalog(toolkit="x")` lists each tool.
   `refresh=true` re-reads what's installed.
+<!-- spawn -->
 - `Spawn(..., toolkits=[...])` (also `Call` / combinator `spec`s) —
   serve the child a slice, in `tb activate` grammar: `"heptapod"`
   (whole toolkit), `"heptapod/llp"` (one bundle), `"heptapod__Pythia"`
@@ -954,14 +960,27 @@ check of a child's result.
   (or `child="self"`). A running turn never gains tools: the grantee
   can call them from its next turn, conversation intact, which hylo
   starts as soon as its current turn ends (it gets a grant notice).
+<!-- /spawn -->
+<!-- nospawn -->
+<!-- root -->
+- `GrantToolkits(child="self", toolkits)` — add toolkits you hold to
+  your own grant. A running turn never gains tools: you can call them
+  from your next turn, which hylo starts as soon as this one ends (you
+  get a grant notice). Take what the current step needs, not
+  everything you hold: a short, relevant tool list is used far better
+  than a long one.
+<!-- /root -->
+<!-- /nospawn -->
 - `RequestToolkits(toolkits, reason)` — ask your parent for tools you
   lack. You'll get a grant notice, then the tools from your next turn,
   or a reply saying why not.
+<!-- spawn -->
 
 When a child's message has `"request": "toolkits"`, decide: grant it
 (`GrantToolkits`) if it serves the task and you hold it; if you don't
 hold it, `RequestToolkits` from your own parent first; otherwise reply
 explaining why not.
+<!-- /spawn -->
 
 Toolkits also ship **skills**: the author's guides to using their tools
 well. A grant carries the skills of what it covers (a bundle grant
